@@ -1,0 +1,11 @@
+{
+  "name": "ar-art-gallery",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Marker-based AR web app that animates artwork via MindAR image tracking + Three.js.",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

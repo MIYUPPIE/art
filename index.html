@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0d1a" />
+  <title>AR Art Gallery</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8E%A8%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- three.js must stay < 0.162 (MindAR 1.2.5 uses the removed sRGBEncoding). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- Loading / error screen -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Starting camera…</p>
+  </div>
+
+  <!-- AR render target -->
+  <div id="ar-container"></div>
+
+  <!-- UI overlay (revealed once AR is ready) -->
+  <div id="ui-layer" class="hidden">
+    <div class="header">
+      <h1>🎨 AR Art Gallery</h1>
+      <div class="status">
+        <span id="tracker-status" class="badge">Scanning…</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btn-particles" class="active">✨ Particles</button>
+      <button id="btn-3d">🎭 3D Model</button>
+      <button id="btn-video">🎬 Video</button>
+      <button id="btn-reset">↺ Reset</button>
+    </div>
+
+    <div class="instructions" id="instructions">
+      Point your camera at the artwork to reveal the magic
+    </div>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

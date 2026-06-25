@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compile Artwork → .mind</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #0d0d1a; color: #eee; margin: 0; padding: 32px; line-height: 1.5; }
+    .card { max-width: 640px; margin: 0 auto; }
+    h1 { background: linear-gradient(90deg, #00d4ff, #7b2cbf); -webkit-background-clip: text;
+         background-clip: text; -webkit-text-fill-color: transparent; }
+    .drop { border: 2px dashed rgba(255,255,255,0.3); border-radius: 16px; padding: 40px;
+            text-align: center; cursor: pointer; transition: all .2s; margin: 20px 0; }
+    .drop.over { border-color: #00d4ff; background: rgba(0,212,255,0.08); }
+    img#preview { max-width: 100%; border-radius: 12px; margin: 16px 0; display: none; }
+    button { background: linear-gradient(135deg, #00d4ff, #7b2cbf); color: #fff; border: none;
+             padding: 12px 22px; border-radius: 12px; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .bar { height: 8px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden;
+           margin: 16px 0; display: none; }
+    .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #00d4ff, #7b2cbf); transition: width .2s; }
+    code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; }
+    .tips { font-size: .9rem; color: rgba(255,255,255,0.7); }
+  </style>
+  <script type="importmap">
+  { "imports": { "mindar-image": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js" } }
+  </script>
+</head>
+<body>
+  <div class="card">
+    <h1>Compile your artwork</h1>
+    <p>Turn an image into a <code>.mind</code> target — entirely in your browser, nothing is uploaded.
+       Drop the result in <code>targets/</code> and point <code>src/config.js</code> at it.</p>
+
+    <div class="drop" id="drop">
+      <p>📷 Drop an image here, or click to choose</p>
+      <input type="file" id="file" accept="image/*" hidden />
+    </div>
+    <img id="preview" alt="preview" />
+
+    <button id="go" disabled>Compile → download .mind</button>
+    <div class="bar" id="bar"><div></div></div>
+    <p id="msg"></p>
+
+    <p class="tips">Good targets are high-contrast, detailed, and asymmetric (≥ 300px).
+       Avoid blank space, repeating patterns, and glossy reflections.</p>
+  </div>
+
+  <script type="module">
+    import 'mindar-image'; // defines window.MINDAR.IMAGE.Compiler
+
+    const drop = document.getElementById('drop');
+    const fileInput = document.getElementById('file');
+    const preview = document.getElementById('preview');
+    const go = document.getElementById('go');
+    const bar = document.getElementById('bar');
+    const barFill = bar.firstElementChild;
+    const msg = document.getElementById('msg');
+    let image = null;
+
+    function loadFile(file) {
+      if (!file || !file.type.startsWith('image/')) { msg.textContent = 'Please choose an image file.'; return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { image = img; preview.src = url; preview.style.display = 'block'; go.disabled = false;
+                           msg.textContent = `Loaded ${img.naturalWidth}×${img.naturalHeight}. Ready to compile.`; };
+      img.src = url;
+    }
+
+    drop.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
+    ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', (e) => loadFile(e.dataTransfer.files[0]));
+
+    go.addEventListener('click', async () => {
+      if (!image) return;
+      go.disabled = true;
+      bar.style.display = 'block';
+      msg.textContent = 'Compiling… this can take a minute for detailed images.';
+      try {
+        const compiler = new window.MINDAR.IMAGE.Compiler();
+        await compiler.compileImageTargets([image], (p) => { barFill.style.width = p.toFixed(1) + '%'; });
+        const buffer = await compiler.exportData();
+        const blob = new Blob([buffer]);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'targets.mind';
+        a.click();
+        msg.textContent = '✓ Done. Move targets.mind into the targets/ folder and update src/config.js.';
+      } catch (err) {
+        console.error(err);
+        msg.textContent = 'Compile failed: ' + (err?.message || err);
+      } finally {
+        go.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

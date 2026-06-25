@@ -1,0 +1,26 @@
+# Turnkey HTTPS static hosting for the AR Art Gallery.
+# Caddy fetches a Let's Encrypt cert automatically (needs a real domain whose
+# DNS A/AAAA record points at this VPS, ports 80 + 443 open).
+#
+#   1. Copy the project (NOT node_modules, NOT the scratch dir) to /var/www/ar-art
+#   2. Edit the domain below
+#   3. caddy run --config /etc/caddy/Caddyfile   (or: systemctl restart caddy)
+#
+# That's it. No Node needed on the server — this is a static site.
+
+your-domain.com {
+    root * /var/www/ar-art
+    encode gzip
+    file_server
+
+    # .js already maps to text/javascript; be explicit for .mjs and .mind so a
+    # stray reverse proxy / older Caddy can't break ES module loading.
+    @mjs path *.mjs
+    header @mjs Content-Type text/javascript
+    @mind path *.mind
+    header @mind Content-Type application/octet-stream
+
+    # The dev server is local-only; never expose Node tooling.
+    @blocked path /tools/serve.mjs /tests/* /package.json /node_modules/*
+    respond @blocked 404
+}
