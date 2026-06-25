@@ -6,50 +6,118 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0d0d1a" />
+  <meta name="theme-color" content="#0b0b16" />
   <title>AR Art Gallery</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8E%A8%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./styles.css" />
 
-  <!-- three.js must stay < 0.162 (MindAR 1.2.5 uses the removed sRGBEncoding). -->
+  <!-- three.js must stay < 0.162 (MindAR 1.2.5 uses the removed sRGBEncoding).
+       mindar-image is lazy-imported only when a user uploads their own artwork. -->
   <script type="importmap">
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js",
+      "mindar-image": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"
     }
   }
   </script>
 </head>
 <body>
-  <!-- Loading / error screen -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <p>Starting camera…</p>
-  </div>
+  <div class="bg-glow"></div>
 
-  <!-- AR render target -->
+  <!-- AR camera render target (filled when the session launches) -->
   <div id="ar-container"></div>
 
-  <!-- UI overlay (revealed once AR is ready) -->
-  <div id="ui-layer" class="hidden">
-    <div class="header">
-      <h1>🎨 AR Art Gallery</h1>
-      <div class="status">
-        <span id="tracker-status" class="badge">Scanning…</span>
+  <!-- ===== Landing ===== -->
+  <main id="screen-home" class="screen">
+    <div class="card glass">
+      <div class="brand">
+        <div class="logo">🎨</div>
+        <h1>AR Art Gallery</h1>
+        <p class="tagline">Bring artwork to life. Point your camera and watch it move.</p>
       </div>
+
+      <div class="seg" role="tablist">
+        <button class="seg-btn active" data-tab="demo" role="tab">Demo</button>
+        <button class="seg-btn" data-tab="custom" role="tab">My artwork</button>
+      </div>
+
+      <section class="panel" data-panel="demo">
+        <img class="demo-thumb" src="./assets/example-card.png" alt="Demo marker card" />
+        <p class="hint">
+          After launch, point your camera at this card.
+          <a href="./tools/marker.html" target="_blank" rel="noopener">Open full-screen →</a>
+        </p>
+      </section>
+
+      <section class="panel hidden" data-panel="custom">
+        <label class="drop" id="art-drop">
+          <input type="file" id="art-input" accept="image/*" hidden />
+          <div class="drop-body" id="art-empty">
+            <div class="drop-ico">🖼️</div>
+            <strong>Upload your artwork</strong>
+            <span>Tap or drag an image. This becomes the marker.</span>
+          </div>
+          <img class="drop-preview hidden" id="art-preview" alt="Artwork preview" />
+          <div class="drop-status hidden" id="art-status"></div>
+        </label>
+
+        <label class="drop small" id="vid-drop">
+          <input type="file" id="vid-input" accept="video/*" hidden />
+          <div class="drop-body">
+            <div class="drop-ico">🎬</div>
+            <strong>Add an animation <em>(optional)</em></strong>
+            <span id="vid-label">A video to play on your artwork.</span>
+          </div>
+        </label>
+
+        <p class="hint">Best markers: detailed, high-contrast, matte (not glossy).</p>
+      </section>
+
+      <button id="launch" class="btn-primary">
+        <span class="btn-ico">📷</span><span>Launch AR</span>
+      </button>
+      <p class="micro">Camera runs on your device only. Nothing is uploaded.</p>
+    </div>
+  </main>
+
+  <!-- ===== Compiling overlay ===== -->
+  <div id="screen-compiling" class="screen hidden">
+    <div class="card glass center">
+      <div class="spinner"></div>
+      <h2>Analyzing your artwork…</h2>
+      <div class="bar"><div id="compile-bar"></div></div>
+      <p id="compile-pct" class="micro">0%</p>
+    </div>
+  </div>
+
+  <!-- ===== AR overlay ===== -->
+  <div id="ui-layer" class="hidden">
+    <div class="top">
+      <span id="tracker-status" class="pill"><i class="dot"></i><span>Scanning…</span></span>
+      <button id="btn-change" class="ghost">⟵ Change</button>
     </div>
 
-    <div class="controls">
-      <button id="btn-particles" class="active">✨ Particles</button>
-      <button id="btn-3d">🎭 3D Model</button>
-      <button id="btn-video">🎬 Video</button>
-      <button id="btn-reset">↺ Reset</button>
-    </div>
+    <div id="instructions" class="toast">Point your camera at the artwork</div>
 
-    <div class="instructions" id="instructions">
-      Point your camera at the artwork to reveal the magic
+    <div class="dock">
+      <button id="btn-particles" class="dock-btn active"><span class="e">✨</span>Particles</button>
+      <button id="btn-3d" class="dock-btn"><span class="e">🦋</span>3D</button>
+      <button id="btn-video" class="dock-btn"><span class="e">🎬</span>Video</button>
+      <button id="btn-reset" class="dock-btn"><span class="e">↺</span>Reset</button>
+    </div>
+  </div>
+
+  <!-- ===== Camera / error screen ===== -->
+  <div id="screen-error" class="screen hidden">
+    <div class="card glass center">
+      <div class="logo">🚫</div>
+      <h2 id="err-title">Camera blocked</h2>
+      <p id="err-msg" class="hint"></p>
+      <button id="err-retry" class="btn-primary"><span>Try again</span></button>
+      <button id="err-home" class="ghost">Back to start</button>
     </div>
   </div>
 

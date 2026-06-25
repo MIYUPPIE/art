@@ -9,7 +9,6 @@ export function buildVideo(videoUrl) {
   group.name = 'video';
 
   const video = document.createElement('video');
-  video.src = videoUrl;
   video.crossOrigin = 'anonymous';
   video.loop = true;
   video.muted = true; // required for autoplay on mobile
@@ -65,6 +64,15 @@ export function buildVideo(videoUrl) {
 
   video.addEventListener('canplay', () => { state.ready = true; });
   video.addEventListener('error', () => { state.failed = true; applyPlaceholder(); });
+
+  // No clip supplied (demo, or user skipped the optional upload): show the
+  // labelled placeholder instead of trying to load a missing file.
+  if (videoUrl) {
+    video.src = videoUrl;
+  } else {
+    state.failed = true;
+    applyPlaceholder();
+  }
 
   group.userData = { state, texture };
   return group;

@@ -9,6 +9,10 @@ QR codes, no app install. Tracking is natural-feature based via
 Effects: floating **particles**, a procedural **3D butterfly**, a framed **video**
 overlay, plus an always-on glow border that confirms detection.
 
+The app opens on a landing screen with two paths — **Demo** (the bundled card) or
+**My artwork** (upload your own). The camera is only requested when you tap
+**Launch AR**, never on page load.
+
 ## Run it locally
 
 ```bash
@@ -33,20 +37,23 @@ npx --yes localtunnel --port 8080   # or: ngrok http 8080
 
 Open the HTTPS URL it prints on your phone, allow the camera, point at the card.
 
-## Use your own artwork
+## Use your own artwork (in-app, recommended)
 
-1. `npm run serve`, then open <http://localhost:8080/tools/compile.html>.
-2. Drop in your image (high-contrast, detailed, asymmetric works best). It compiles
-   to a `.mind` file **in your browser** — nothing is uploaded.
-3. Move the downloaded file into `targets/` and point `src/config.js` at it:
-   ```js
-   targetSrc: './targets/my-artwork.mind',
-   ```
+On the landing screen pick **My artwork**:
+1. Upload an image (high-contrast, detailed, matte). It compiles to a MindAR target
+   **in your browser** — nothing is uploaded to a server.
+2. Optionally add a video that plays on your artwork via the 🎬 effect.
+3. Tap **Launch AR** and point the camera at your (printed/displayed) artwork.
 
-## Add a video or 3D model
+The compiled target is held as an in-memory blob for the session. To bake a target
+in permanently instead, use the standalone compiler at
+<http://localhost:8080/tools/compile.html>, drop the `.mind` in `targets/`, and set
+`targetSrc` in `src/config.js`.
 
-- **Video:** drop a clip at `assets/video.mp4`. The 🎬 button plays it framed above
-  the art. (Missing file → a labelled placeholder, app still runs.)
+## Add a default video or 3D model
+
+- **Video:** the in-app upload sets it per session. For a baked-in default, drop a
+  clip at `assets/video.mp4`. (Missing file → a labelled placeholder, app still runs.)
 - **3D model:** put a `.glb` at `assets/model.glb` and set
   `modelSrc: './assets/model.glb'` in `src/config.js`. Embedded animation clips play
   automatically; otherwise the procedural butterfly is used.
