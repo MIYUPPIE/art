@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+# Static site: upload the repo as-is and publish it. No build step, no Jekyll —
+# the importmap (three + mind-ar via CDN), ES modules, and the binary .mind
+# target are served exactly as committed.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GITHUB_TOKEN scopes the deploy needs, regardless of repo default.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; newer pushes supersede in-flight ones.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages (auto-enables it on first run)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # upload-pages-artifact tars the path and excludes .git/.github by default.
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
