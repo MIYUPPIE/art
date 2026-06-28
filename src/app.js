@@ -3,6 +3,7 @@ import 'mindar-image-three'; // side-effect: defines window.MINDAR.IMAGE.MindART
 
 import { config } from './config.js';
 import { validateUpload } from './core/upload.js';
+import { detectWebGL, WEBGL_HELP } from './core/webgl.js';
 import {
   visibilityFor,
   resolveMode,
@@ -34,9 +35,10 @@ class ARArtApp {
     this._raf = 0;
 
     this.debug = new URLSearchParams(location.search).has('debug');
+    this.webgl = detectWebGL();
     this.state = {
-      secure: window.isSecureContext, mindar: !!MindARThree, targetHttp: '-',
-      camera: 'idle', tracking: 'idle', found: 0, frames: 0, fps: 0,
+      secure: window.isSecureContext, mindar: !!MindARThree, webgl: this.webgl.ok ? `v${this.webgl.version}` : 'OFF',
+      targetHttp: '-', camera: 'idle', tracking: 'idle', found: 0, frames: 0, fps: 0,
     };
     this._fpsAccum = 0; this._fpsFrames = 0; this._cameraStartedAt = 0; this._scanHintShown = false;
 
@@ -137,11 +139,26 @@ class ARArtApp {
   compileArt(img) {
     this.art.image = img;
     this.art.targetUrl = null;
+    // The compiler's tfjs backend needs WebGL. Without it compileImageTargets
+    // throws deep inside tfjs and never resolves — so fail fast with guidance.
+    if (!this.webgl.ok) {
+      this.setArtStatus(WEBGL_HELP, 'err');
+      this.art.compiling = Promise.reject(new Error('WEBGL_OFF'));
+      this.art.compiling.catch(() => {}); // pre-attach so it isn't an unhandled rejection
+      return this.art.compiling;
+    }
     this.setArtStatus('Preparing marker…', null);
     this.art.compiling = (async () => {
       const Compiler = await this.loadCompiler();
       const compiler = new Compiler();
-      await compiler.compileImageTargets([img], (p) => this.setArtStatus(`Preparing marker… ${Math.round(p)}%`, null));
+      // Watchdog: if compile makes no forward progress for 45s, surface an error
+      // instead of leaving the user staring at a frozen spinner.
+      let lastProgress = Date.now();
+      const compile = compiler.compileImageTargets([img], (p) => {
+        lastProgress = Date.now();
+        this.setArtStatus(`Preparing marker… ${Math.round(p)}%`, null);
+      });
+      await Promise.race([compile, this.stallGuard(() => lastProgress)]);
       const buffer = await compiler.exportData();
       if (this.art.targetUrl) URL.revokeObjectURL(this.art.targetUrl);
       this.art.targetUrl = URL.createObjectURL(new Blob([buffer]));
@@ -149,10 +166,26 @@ class ARArtApp {
       return this.art.targetUrl;
     })().catch((e) => {
       console.error('Compile failed:', e);
-      this.setArtStatus('Compile failed. Try another image.', 'err');
+      this.setArtStatus(e?.message === 'COMPILE_STALLED'
+        ? 'Marker prep stalled. Reload and try a smaller, high-contrast image.'
+        : 'Compile failed. Try another image.', 'err');
       throw e;
     });
     return this.art.compiling;
+  }
+
+  // Rejects with COMPILE_STALLED if no progress callback fires for `ms`.
+  stallGuard(getLastProgress, ms = 45000) {
+    return new Promise((_, reject) => {
+      const id = setInterval(() => {
+        if (Date.now() - getLastProgress() > ms) {
+          clearInterval(id);
+          reject(new Error('COMPILE_STALLED'));
+        }
+      }, 1000);
+      // Don't keep the loop alive once the winning promise settles.
+      if (typeof id?.unref === 'function') id.unref();
+    });
   }
 
   async loadCompiler() {
@@ -197,6 +230,11 @@ class ARArtApp {
     if (!window.isSecureContext) {
       const e = new Error('This page must be served over https:// for the camera to work.');
       e.name = 'SecurityError';
+      throw e;
+    }
+    if (!this.webgl.ok) {
+      const e = new Error(WEBGL_HELP);
+      e.name = 'WebGLError';
       throw e;
     }
     if (!MindARThree) throw new Error('MindAR failed to load (check your connection).');
@@ -335,7 +373,10 @@ class ARArtApp {
     const name = err?.name;
     let title = 'Something went wrong';
     let msg = err?.message || String(err);
-    if (name === 'NotAllowedError' || name === 'SecurityError') {
+    if (name === 'WebGLError') {
+      title = 'WebGL is off';
+      msg = WEBGL_HELP;
+    } else if (name === 'NotAllowedError' || name === 'SecurityError') {
       title = 'Camera blocked';
       msg = 'Allow camera access for this site, then tap Try again. On a phone this also requires https://.';
     } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
@@ -375,7 +416,7 @@ class ARArtApp {
     const s = this.state;
     this._hud.textContent =
       `secureContext : ${s.secure}\nprotocol      : ${location.protocol}\n` +
-      `MindAR        : ${s.mindar}\ncamera        : ${s.camera}\n` +
+      `WebGL         : ${s.webgl}\nMindAR        : ${s.mindar}\ncamera        : ${s.camera}\n` +
       `tracking      : ${s.tracking}  (found x${s.found})\nframes / fps  : ${s.frames} / ${s.fps}\n` +
       `mode          : ${this.mode}  tab: ${this.tab}`;
   }
