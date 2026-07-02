@@ -1,0 +1,16 @@
+{
+  "name": "AR Art Gallery",
+  "short_name": "AR Art",
+  "description": "Point your camera at artwork and watch it come to life.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0b16",
+  "theme_color": "#0b0b16",
+  "icons": [
+    { "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

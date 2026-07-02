@@ -19,7 +19,15 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  /* Mobile: no rubber-band bounce, no grey tap flashes, no iOS text inflation */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
+
+/* Kill the 300ms delay / double-tap zoom on every control */
+button, .drop, a { touch-action: manipulation; }
 
 /* Animated background glow behind the landing screens */
 .bg-glow {
@@ -41,7 +49,10 @@ body {
   position: fixed;
   inset: 0;
   width: 100vw;
+  /* iOS Safari: 100vh includes the collapsed URL bar; dvh tracks what is
+     actually visible so the camera canvas is never cropped or letterboxed. */
   height: 100vh;
+  height: 100dvh;
   z-index: 1;
 }
 #ar-container canvas { display: block; }
@@ -162,6 +173,24 @@ body {
   transition: background 0.2s;
 }
 .ghost:hover { background: rgba(255, 255, 255, 0.16); }
+.ghost:disabled { opacity: 0.5; cursor: progress; }
+.ghost.wide { width: 100%; padding: 12px; }
+
+/* ===== Share result ===== */
+.share-result {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  margin-top: 10px; padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--stroke); border-radius: 14px;
+}
+.share-result.hidden { display: none; }
+#share-qr { border-radius: 10px; max-width: 180px; }
+#share-qr.hidden { display: none; }
+.share-link {
+  color: var(--cyan); font-size: 0.82rem; text-decoration: none;
+  word-break: break-all; text-align: center;
+}
+.share-actions { display: flex; gap: 8px; }
 
 /* ===== Spinner + progress ===== */
 .spinner {
@@ -217,3 +246,15 @@ body {
 .dock-btn.active { color: #fff; background: var(--grad); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.3); }
 
 h2 { font-size: 1.25rem; }
+
+.seg.hidden { display: none; }
+
+/* Landscape phones: little vertical room — tighten the card and the dock */
+@media (max-height: 480px) {
+  .card { padding: 16px; gap: 10px; }
+  .logo { width: 42px; height: 42px; font-size: 22px; border-radius: 12px; }
+  .brand h1 { font-size: 1.2rem; }
+  .demo-thumb { max-height: 110px; object-fit: cover; }
+  .dock-btn { min-width: 56px; padding: 6px; }
+  .dock-btn .e { font-size: 1.05rem; }
+}

@@ -1,0 +1,44 @@
+# AR Art Gallery on the VPS: static frontend (nginx) + gallery-api (node).
+# Lives at /home/deploy/ar-art/ next to site/ and api/ (deploy/deploy.sh puts
+# everything in place). Only nginx is reachable, via the Nginx Proxy Manager
+# network — NPM proxies the public domain to ar-art_web:80, which serves the
+# app and forwards /api to the api container.
+
+services:
+  web:
+    image: nginx:alpine
+    container_name: ar-art_web
+    restart: unless-stopped
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - npm
+    depends_on:
+      - api
+
+  api:
+    image: node:24-alpine
+    container_name: ar-art_api
+    restart: unless-stopped
+    working_dir: /app
+    command: node index.mjs
+    environment:
+      PORT: "8787"
+      DATA_DIR: /data
+      MAX_ARTWORKS: "500"
+      TRUST_PROXY: "1"
+    volumes:
+      - ./api:/app:ro
+      - api-data:/data
+    networks:
+      - npm
+
+volumes:
+  # Named volume: artwork storage survives container recreation and rsyncs.
+  api-data:
+
+networks:
+  npm:
+    external: true
+    name: nginx-proxy-manager_default

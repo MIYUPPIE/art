@@ -9,6 +9,10 @@ export const config = {
   videoSrc: './assets/video.mp4',
   modelSrc: null, // e.g. './assets/model.glb' to load a real 3D model
 
+  // Gallery API override. null = auto: same-origin /api, or the production API
+  // when the frontend is on a static host (see src/core/api.js).
+  apiBase: null,
+
   // MindAR tracking tuning. Lower filterMinCF = smoother but laggier.
   mindar: {
     maxTrack: 1,

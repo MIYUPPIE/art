@@ -7,8 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0b0b16" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <title>AR Art Gallery</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8E%A8%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="./styles.css" />
 
   <!-- three.js must stay < 0.162 (MindAR 1.2.5 uses the removed sRGBEncoding).
@@ -52,6 +54,13 @@
         </p>
       </section>
 
+      <!-- Shared-artwork panel (shown instead of the tabs when opened via ?art=<id>) -->
+      <section class="panel hidden" data-panel="shared">
+        <img class="demo-thumb" id="shared-thumb" alt="Shared artwork" />
+        <p class="hint" id="shared-hint">Point your camera at this artwork after launch.</p>
+        <p class="hint"><a href="./">Create your own AR artwork →</a></p>
+      </section>
+
       <section class="panel hidden" data-panel="custom">
         <label class="drop" id="art-drop">
           <input type="file" id="art-input" accept="image/*" hidden />
@@ -74,6 +83,20 @@
         </label>
 
         <p class="hint">Best markers: detailed, high-contrast, matte (not glossy).</p>
+
+        <!-- Save & share (revealed once the marker is compiled and the API is up) -->
+        <div id="share-box" class="hidden">
+          <button id="btn-share" class="ghost wide">🔗 Save &amp; get share link</button>
+          <div id="share-result" class="share-result hidden">
+            <canvas id="share-qr" width="0" height="0" aria-label="QR code for the share link"></canvas>
+            <a id="share-link" class="share-link" target="_blank" rel="noopener"></a>
+            <div class="share-actions">
+              <button id="btn-copy" class="ghost">Copy link</button>
+              <button id="btn-native-share" class="ghost hidden">Share…</button>
+            </div>
+            <p class="micro">Anyone who opens this link can scan your artwork — print the QR next to it.</p>
+          </div>
+        </div>
       </section>
 
       <button id="launch" class="btn-primary">

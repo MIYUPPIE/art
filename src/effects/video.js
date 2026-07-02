@@ -78,19 +78,6 @@ export function buildVideo(videoUrl) {
   return group;
 }
 
-export function playVideo(group) {
-  const { state } = group.userData;
-  if (state.failed || !state.video) return;
-  const p = state.video.play();
-  if (p && p.catch) p.catch(() => {}); // ignore autoplay rejections
-}
-
-export function pauseVideo(group) {
-  const v = group.userData.state.video;
-  if (v && !v.paused) v.pause();
-}
-
-export function updateVideo(group) {
-  const { texture, state } = group.userData;
-  if (state.ready && !state.failed) texture.needsUpdate = true;
-}
+// Controls live in core (pure, unit-tested); re-exported here so consumers
+// keep importing everything video-related from this effect module.
+export { playVideo, pauseVideo, updateVideo } from '../core/videoControls.js';

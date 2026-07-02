@@ -1,7 +1,29 @@
 # Deploying to a VPS
 
-This is a **static site**. The server needs no Node, no build step — just to serve
-the files over **HTTPS**. `three` and `mind-ar` load from jsDelivr at runtime.
+Two pieces:
+
+- **Frontend** — static files, no build step. `three` and `mind-ar` load from
+  jsDelivr at runtime.
+- **gallery-api** — optional Node service that stores scannable artworks for
+  share links (`services/gallery-api/`, contract in `contracts/gallery-api.md`).
+  Without it the app still runs; share features hide themselves.
+
+## The production VPS (Docker + Nginx Proxy Manager)
+
+The live deployment is `deploy@75.119.159.194` → `/home/deploy/ar-art/`, two
+containers (`ar-art_web` nginx + `ar-art_api` node) on the NPM network. One
+command from the repo root ships both:
+
+```bash
+./deploy/deploy.sh
+```
+
+It rsyncs the frontend to `site/`, the API to `api/`, installs
+`deploy/nginx.conf` + `deploy/docker-compose.yml`, restarts the API container,
+reloads nginx, and smoke-checks `/api/health`. Artwork uploads live in the
+`api-data` Docker volume and survive deploys. Nginx now serves html/js/css with
+`no-cache`, so a plain refresh picks up new code (no more 43-minute stale
+cache).
 
 ## The one hard requirement: HTTPS
 
@@ -60,3 +82,6 @@ repo. Nothing else changes.
       `targetSrc` points at it.
 - [ ] After deploy: `https://your-domain/?debug=1` shows `secureContext: true`,
       `MindAR loaded: true`, `target HTTP: 200`.
+- [ ] If running gallery-api: `https://your-domain/api/health` returns
+      `{"ok":true,"version":1}` and the **Save & get share link** button appears
+      after compiling an upload.

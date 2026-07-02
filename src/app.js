@@ -4,6 +4,7 @@ import 'mindar-image-three'; // side-effect: defines window.MINDAR.IMAGE.MindART
 import { config } from './config.js';
 import { validateUpload } from './core/upload.js';
 import { detectWebGL, WEBGL_HELP } from './core/webgl.js';
+import { resolveApiBase, parseArtId, shareUrlFor, artworkUrls } from './core/api.js';
 import {
   visibilityFor,
   resolveMode,
@@ -30,9 +31,17 @@ class ARArtApp {
     this.entrance = { scale: 0, active: false };
 
     this.tab = 'demo';
-    this.art = { image: null, targetUrl: null, compiling: null }; // uploaded artwork
-    this.clip = { url: null }; // optional uploaded overlay video
+    // uploaded artwork (file + compiled target kept for the share upload)
+    this.art = { image: null, file: null, targetUrl: null, targetBuffer: null, compiling: null };
+    this.clip = { url: null, file: null }; // optional uploaded overlay video
     this._raf = 0;
+    this._wakeLock = null;
+
+    // Gallery backend: probed at boot; share/scan-link features only appear
+    // when it answers. The app is fully usable without it.
+    this.apiBase = resolveApiBase(location, config.apiBase);
+    this.apiOk = false;
+    this.shared = null; // { id, meta } when opened via ?art=<id>
 
     this.debug = new URLSearchParams(location.search).has('debug');
     this.webgl = detectWebGL();
@@ -45,6 +54,47 @@ class ARArtApp {
     this.buildHud();
     this.wireLanding();
     this.show('home');
+    this.initBackend();
+  }
+
+  // ===== gallery backend =====
+  async initBackend() {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 5000);
+      const res = await fetch(`${this.apiBase}/health`, { signal: ctl.signal });
+      clearTimeout(timer);
+      this.apiOk = res.ok && (await res.json()).ok === true;
+    } catch {
+      this.apiOk = false;
+    }
+    this.updateShareUi();
+
+    const artId = parseArtId(location.search);
+    if (artId) await this.loadShared(artId);
+  }
+
+  // Opened via a share link: fetch the artwork and pin the landing to it.
+  async loadShared(id) {
+    const urls = artworkUrls(this.apiBase, id);
+    try {
+      const res = await fetch(urls.meta);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const meta = await res.json();
+      this.shared = { id, meta, urls };
+      $('shared-thumb').src = urls.image;
+      $('shared-hint').textContent = meta.title
+        ? `“${meta.title}” — point your camera at this artwork after launch.`
+        : 'Point your camera at this artwork after launch.';
+      document.querySelector('.seg').classList.add('hidden');
+      this.switchTab('shared');
+    } catch (e) {
+      console.warn('Shared artwork unavailable:', e);
+      this.shared = null;
+      this.switchTab('demo');
+      document.querySelector('.tagline').textContent =
+        'That shared artwork is gone or unreachable — try the demo instead.';
+    }
   }
 
   // ===== screen routing =====
@@ -75,10 +125,35 @@ class ARArtApp {
     on('btn-video', () => this.applyMode('video'));
     on('btn-reset', () => { this.content?.rotation.set(0, 0, 0); this.applyMode('particles'); });
 
+    on('btn-share', () => this.saveAndShare());
+    on('btn-copy', () => this.copyShareLink());
+    on('btn-native-share', () => this.nativeShare());
+
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) pauseVideo(this.video);
       else if (this.video && videoShouldPlay(this.mode, this.isTracking)) playVideo(this.video);
+      // Wake locks are auto-released when the page is hidden; re-acquire.
+      if (!document.hidden && this.mindar) this.acquireWakeLock();
     });
+
+    // MindAR resizes on `resize`, but iOS fires orientation events before the
+    // new layout has settled — nudge it again once dimensions are final.
+    const settle = () => setTimeout(() => { if (this.mindar) this.mindar.resize(); }, 350);
+    window.addEventListener('orientationchange', settle);
+    screen.orientation?.addEventListener?.('change', settle);
+  }
+
+  // Keep the screen on during an AR session (phones dim fast while the user
+  // holds the camera still). Best-effort: unsupported browsers just dim.
+  async acquireWakeLock() {
+    try {
+      this._wakeLock = await navigator.wakeLock?.request('screen');
+    } catch { this._wakeLock = null; }
+  }
+
+  releaseWakeLock() {
+    try { this._wakeLock?.release(); } catch { /* already released */ }
+    this._wakeLock = null;
   }
 
   wireDrop(dropId, inputId, onFile) {
@@ -113,6 +188,8 @@ class ARArtApp {
       const prev = $('art-preview');
       prev.src = url; prev.classList.remove('hidden');
       status.classList.remove('hidden');
+      this.art.file = file; // kept for the share upload
+      this.hideShareResult(); // any previous link belongs to the previous artwork
       // Compile immediately so the gesture -> camera path at Launch stays short.
       this.compileArt(img);
     };
@@ -125,6 +202,8 @@ class ARArtApp {
     if (!v.ok) { $('vid-label').textContent = v.error; return; }
     if (this.clip.url) URL.revokeObjectURL(this.clip.url);
     this.clip.url = URL.createObjectURL(file);
+    this.clip.file = file;
+    this.hideShareResult(); // the link no longer matches what would be saved
     $('vid-label').textContent = `✓ ${file.name}`;
   }
 
@@ -139,6 +218,8 @@ class ARArtApp {
   compileArt(img) {
     this.art.image = img;
     this.art.targetUrl = null;
+    this.art.targetBuffer = null;
+    this.updateShareUi();
     // The compiler's tfjs backend needs WebGL. Without it compileImageTargets
     // throws deep inside tfjs and never resolves — so fail fast with guidance.
     if (!this.webgl.ok) {
@@ -161,8 +242,10 @@ class ARArtApp {
       await Promise.race([compile, this.stallGuard(() => lastProgress)]);
       const buffer = await compiler.exportData();
       if (this.art.targetUrl) URL.revokeObjectURL(this.art.targetUrl);
+      this.art.targetBuffer = buffer; // kept for the share upload
       this.art.targetUrl = URL.createObjectURL(new Blob([buffer]));
       this.setArtStatus('✓ Marker ready', 'ok');
+      this.updateShareUi();
       return this.art.targetUrl;
     })().catch((e) => {
       console.error('Compile failed:', e);
@@ -195,6 +278,99 @@ class ARArtApp {
     return C;
   }
 
+  // ===== save & share =====
+  // The share button appears only when there is something to save (compiled
+  // marker) and somewhere to save it (backend healthy).
+  updateShareUi() {
+    $('share-box')?.classList.toggle('hidden', !(this.apiOk && this.art.targetBuffer));
+  }
+
+  hideShareResult() {
+    $('share-result')?.classList.add('hidden');
+    this._shareUrl = null;
+  }
+
+  async saveAndShare() {
+    const btn = $('btn-share');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const fd = new FormData();
+      const title = (this.art.file?.name || '').replace(/\.[^.]+$/, '');
+      fd.set('title', title);
+      fd.set('target', new Blob([this.art.targetBuffer]), 'art.mind');
+      fd.set('image', this.art.file, this.art.file.name);
+      if (this.clip.file) fd.set('video', this.clip.file, this.clip.file.name);
+
+      const res = await fetch(`${this.apiBase}/artworks`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const why = (await res.json().catch(() => ({}))).error;
+        throw new Error(why || `Upload failed (HTTP ${res.status}).`);
+      }
+      const { id } = await res.json();
+      this.showShareResult(shareUrlFor(id, location));
+    } catch (e) {
+      console.error('Share failed:', e);
+      this.setArtStatus(`Could not save: ${e.message}`, 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔗 Save & get share link';
+    }
+  }
+
+  showShareResult(url) {
+    this._shareUrl = url;
+    const a = $('share-link');
+    a.href = url;
+    a.textContent = url.replace(/^https?:\/\//, '');
+    $('btn-native-share').classList.toggle('hidden', !navigator.share);
+    $('share-result').classList.remove('hidden');
+    this.renderQr(url);
+  }
+
+  // QR is pure garnish on top of the link — if the CDN module fails (offline,
+  // blocked), the link and copy/share buttons still work.
+  async renderQr(url) {
+    const canvas = $('share-qr');
+    try {
+      const { default: QRCode } = await import('https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm');
+      await QRCode.toCanvas(canvas, url, {
+        width: 180,
+        margin: 1,
+        color: { dark: '#0b0b16', light: '#f3f4f8' },
+      });
+      canvas.classList.remove('hidden');
+    } catch (e) {
+      console.warn('QR unavailable:', e);
+      canvas.classList.add('hidden');
+    }
+  }
+
+  async copyShareLink() {
+    if (!this._shareUrl) return;
+    const btn = $('btn-copy');
+    try {
+      await navigator.clipboard.writeText(this._shareUrl);
+      btn.textContent = '✓ Copied';
+    } catch {
+      // Clipboard API can be denied; fall back to selecting the link text.
+      const range = document.createRange();
+      range.selectNodeContents($('share-link'));
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      btn.textContent = 'Press Ctrl/Cmd+C';
+    }
+    setTimeout(() => { btn.textContent = 'Copy link'; }, 2000);
+  }
+
+  async nativeShare() {
+    if (!this._shareUrl || !navigator.share) return;
+    try {
+      await navigator.share({ title: 'AR Art Gallery', text: 'Scan my artwork in AR', url: this._shareUrl });
+    } catch { /* user dismissed the sheet */ }
+  }
+
   // ===== launch =====
   async launch() {
     const btn = $('launch');
@@ -208,6 +384,9 @@ class ARArtApp {
         this.show('compiling');
         targetSrc = this.art.targetUrl || (await this.art.compiling);
         videoSrc = this.clip.url || null;
+      } else if (this.tab === 'shared' && this.shared) {
+        targetSrc = this.shared.urls.target;
+        videoSrc = this.shared.meta.hasVideo ? this.shared.urls.video : null;
       }
 
       await this.setupAR(targetSrc, videoSrc); // <- camera requested here, on the tap
@@ -252,6 +431,16 @@ class ARArtApp {
     this.renderer = renderer; this.scene = scene; this.camera = camera;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
+    // GPU context loss (memory pressure, app switching on mobile) would
+    // otherwise freeze the canvas silently — surface it with a retry path.
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.teardown();
+      const err = new Error('The graphics context was lost — this happens under memory pressure. Tap Try again.');
+      err.name = 'WebGLContextLost';
+      this.showLaunchError(err);
+    });
+
     const anchor = this.mindar.addAnchor(0);
     this.anchor = anchor;
     this.content = new THREE.Group();
@@ -278,6 +467,7 @@ class ARArtApp {
     await this.mindar.start(); // resolves once the camera stream is live
     this.state.camera = 'live'; this._cameraStartedAt = performance.now();
     this._scanHintShown = false; this.updateHud();
+    this.acquireWakeLock();
 
     const loop = () => { this.tick(); this._raf = requestAnimationFrame(loop); };
     this._raf = requestAnimationFrame(loop);
@@ -285,6 +475,7 @@ class ARArtApp {
 
   teardown() {
     if (this._raf) { cancelAnimationFrame(this._raf); this._raf = 0; }
+    this.releaseWakeLock();
     if (this.video) pauseVideo(this.video);
     if (this.mindar) {
       try { this.mindar.stop(); } catch { /* not started */ }
@@ -376,12 +567,15 @@ class ARArtApp {
     if (name === 'WebGLError') {
       title = 'WebGL is off';
       msg = WEBGL_HELP;
+    } else if (name === 'WebGLContextLost') {
+      title = 'Graphics stopped';
+      // err.message already explains; keep it as-is
     } else if (name === 'NotAllowedError' || name === 'SecurityError') {
       title = 'Camera blocked';
       msg = 'Allow camera access for this site, then tap Try again. On a phone this also requires https://.';
     } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
       title = 'No camera found'; msg = 'Connect or enable a camera, then try again.';
-    } else if (name === 'NotReadableError') {
+    } else if (name === 'NotReadableError' || name === 'AbortError') {
       title = 'Camera in use'; msg = 'Another app is using the camera. Close it and try again.';
     }
     $('err-title').textContent = title;

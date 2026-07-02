@@ -2,6 +2,10 @@
 // Zero-dependency static dev server with correct MIME types and HTTP range
 // support (needed for <video> seeking). localhost is a secure context, so the
 // camera works without HTTPS during local development.
+//
+// /api/* is proxied to the gallery-api service (same-origin, exactly like the
+// production nginx config). Start it with `npm run api`, or `npm run dev` for
+// both at once — without it the app simply hides the share features.
 import http from 'node:http';
 import { stat, readFile, open } from 'node:fs/promises';
 import { join, normalize, extname } from 'node:path';
@@ -9,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PORT = Number(process.env.PORT) || 8080;
+const API_UPSTREAM = process.env.API_UPSTREAM || 'http://127.0.0.1:8787';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -35,8 +40,22 @@ function safePath(urlPath) {
   return join(ROOT, rel);
 }
 
+function proxyApi(req, res) {
+  const upstream = new URL(req.url, API_UPSTREAM);
+  const fwd = http.request(upstream, { method: req.method, headers: req.headers }, (up) => {
+    res.writeHead(up.statusCode, up.headers);
+    up.pipe(res);
+  });
+  fwd.on('error', () => {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end('{"error":"gallery-api is not running (npm run api)"}');
+  });
+  req.pipe(fwd);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.url.startsWith('/api/')) return proxyApi(req, res);
     let filePath = safePath(req.url === '/' ? '/index.html' : req.url);
     let info = await stat(filePath).catch(() => null);
     if (info?.isDirectory()) {

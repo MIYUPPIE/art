@@ -11,6 +11,13 @@
 your-domain.com {
     root * /var/www/ar-art
     encode gzip
+
+    # Gallery API (share links / stored artworks). Run it on the VPS with:
+    #   PORT=8787 node services/gallery-api/index.mjs
+    # Without it the app still works — share features hide themselves when
+    # /api/health doesn't answer.
+    reverse_proxy /api/* localhost:8787
+
     file_server
 
     # .js already maps to text/javascript; be explicit for .mjs and .mind so a
