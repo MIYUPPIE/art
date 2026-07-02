@@ -46,6 +46,7 @@ export function buildArtifact() {
     const root = new THREE.Group();
     root.add(crystal, cage, core, rings);
     root.position.set(0, 0.25, 0.1);
+    root.scale.setScalar(1.3);
     group.add(root);
 
     // Add highly intense point light

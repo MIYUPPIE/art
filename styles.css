@@ -240,6 +240,7 @@ button, .drop, a { touch-action: manipulation; }
   min-width: 66px; padding: 9px 8px; cursor: pointer;
   background: transparent; color: var(--muted); border: 0; border-radius: 12px;
   font-size: 0.7rem; font-weight: 600; transition: all 0.2s;
+  touch-action: manipulation;
 }
 .dock-btn .e { font-size: 1.25rem; }
 .dock-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }

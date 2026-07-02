@@ -16,7 +16,7 @@ export function buildVortex() {
     const colorOutside = new THREE.Color(0x00d4ff);
 
     for (let i = 0; i < particleCount; i++) {
-        const radius = Math.random() * Math.random() * 1.0;
+const radius = Math.random() * Math.random() * 1.1;
         const angle = Math.random() * Math.PI * 2;
 
         positions[i * 3] = Math.cos(angle) * radius;
@@ -37,17 +37,18 @@ export function buildVortex() {
     particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particleMat = new THREE.PointsMaterial({
-        size: 0.05,
+        size: 0.08,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         sizeAttenuation: false,
     });
 
     const vortex = new THREE.Points(particleGeo, particleMat);
-    vortex.position.set(0, 0, 0.05); // slightly above the mask
+    vortex.position.set(0, 0, 0.08); // slightly above the mask
+    vortex.scale.setScalar(1.4);
 
     // Tilted so it's clearly visible when phone is pointed
     vortex.rotation.x = Math.PI * 0.1;
