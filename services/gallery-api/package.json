@@ -1,0 +1,11 @@
+{
+  "name": "gallery-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stores scannable artworks (image + compiled MindAR target + optional video) and serves them via share links. Zero dependencies.",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

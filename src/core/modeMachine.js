@@ -1,7 +1,7 @@
 // Pure mode state machine for AR effect switching.
 // No DOM, no THREE — fully deterministic and unit-testable in Node.
 
-export const MODES = Object.freeze(['particles', '3d', 'video']);
+export const MODES = Object.freeze(['particles', '3d', 'video', 'artifact', 'vortex']);
 export const DEFAULT_MODE = 'particles';
 
 export function isValidMode(mode) {
@@ -21,6 +21,8 @@ export function visibilityFor(mode) {
     particles: m === 'particles',
     model: m === '3d',
     video: m === 'video',
+    artifact: m === 'artifact',
+    vortex: m === 'vortex',
   };
 }
 

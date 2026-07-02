@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { PALETTE } from './palette.js';
 
-// A pulsing glow border that sits just behind the tracked artwork to confirm
+// A breathing glow border that sits just behind the tracked artwork to confirm
 // detection. Pure shader work — no per-frame CPU cost beyond a uniform update.
 
 const vertexShader = /* glsl */ `
@@ -16,15 +17,16 @@ const fragmentShader = /* glsl */ `
   uniform vec3 color;
   varying vec2 vUv;
   void main() {
-    float b = 0.06;
+    float b = 0.07;
     vec2 uv = vUv;
     float edge = smoothstep(0.0, b, uv.x) *
                  smoothstep(1.0, 1.0 - b, uv.x) *
                  smoothstep(0.0, b, uv.y) *
                  smoothstep(1.0, 1.0 - b, uv.y);
-    float pulse = 0.6 + 0.4 * sin(time * 3.0);
-    float glow = (1.0 - edge) * pulse;
-    gl_FragColor = vec4(color, glow * 0.6);
+    float border = 1.0 - edge;
+    // Slow breathing rather than a hard blink.
+    float pulse = 0.6 + 0.4 * sin(time * 1.6);
+    gl_FragColor = vec4(color, border * pulse * 0.7);
   }
 `;
 
@@ -32,7 +34,7 @@ export function buildFrame() {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       time: { value: 0 },
-      color: { value: new THREE.Color(0x00d4ff) },
+      color: { value: new THREE.Color(PALETTE.cyan) },
     },
     vertexShader,
     fragmentShader,
