@@ -41,6 +41,6 @@ ssh "$HOST" "cd $DEST \
   && docker exec ar-art_web nginx -s reload"
 
 echo "==> smoke check"
-ssh "$HOST" "docker exec ar-art_web wget -qO- http://api:8787/api/health && echo && docker exec ar-art_web wget -q --spider http://localhost:80/ && echo 'web: ok'"
+ssh "$HOST" "docker exec ar-art_web wget -qO- http://api:8787/api/health && echo && docker exec ar-art_web wget -q --spider http://127.0.0.1:80/ && echo 'web: ok'"
 
 echo "Done. Hard-refresh the site (Ctrl+Shift+R) — html/js are no-cache now."

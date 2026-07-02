@@ -15,6 +15,8 @@ import { buildParticles, updateParticles } from './effects/particles.js';
 import { buildModel, updateModel, loadGltf } from './effects/model.js';
 import { buildVideo, updateVideo, playVideo, pauseVideo } from './effects/video.js';
 import { buildFrame, updateFrame } from './effects/frame.js';
+import { buildArtifact, updateArtifact } from './effects/artifact.js';
+import { buildVortex, updateVortex } from './effects/vortex.js';
 
 // Capture MindARThree NOW. The compiler bundle (mindar-image) is lazy-imported
 // on upload and overwrites window.MINDAR.IMAGE, so the global ref would vanish —
@@ -121,6 +123,8 @@ class ARArtApp {
 
     const on = (id, fn) => $(id)?.addEventListener('click', fn);
     on('btn-particles', () => this.applyMode('particles'));
+    on('btn-vortex', () => this.applyMode('vortex'));
+    on('btn-artifact', () => this.applyMode('artifact'));
     on('btn-3d', () => this.applyMode('3d'));
     on('btn-video', () => this.applyMode('video'));
     on('btn-reset', () => { this.content?.rotation.set(0, 0, 0); this.applyMode('particles'); });
@@ -471,7 +475,9 @@ class ARArtApp {
     this.model = buildModel();
     this.video = buildVideo(videoSrc);
     this.frame = buildFrame();
-    this.content.add(this.frame, this.particles, this.model, this.video);
+    this.artifact = buildArtifact();
+    this.vortex = buildVortex();
+    this.content.add(this.frame, this.particles, this.model, this.video, this.artifact, this.vortex);
 
     if (config.modelSrc) {
       loadGltf(this.model, config.modelSrc).catch((e) => console.warn('Model load failed:', e));
@@ -534,6 +540,8 @@ class ARArtApp {
     if (this.particles.visible) updateParticles(this.particles, dt, t);
     if (this.model.visible) updateModel(this.model, dt, t);
     if (this.video.visible) updateVideo(this.video);
+    if (this.artifact.visible) updateArtifact(this.artifact, dt, t);
+    if (this.vortex.visible) updateVortex(this.vortex, dt, t);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -545,6 +553,8 @@ class ARArtApp {
     this.particles.visible = vis.particles;
     this.model.visible = vis.model;
     this.video.visible = vis.video;
+    this.artifact.visible = vis.artifact;
+    this.vortex.visible = vis.vortex;
     if (videoShouldPlay(this.mode, this.isTracking)) playVideo(this.video);
     else pauseVideo(this.video);
     this.syncButtons();
@@ -567,7 +577,7 @@ class ARArtApp {
 
   // ===== UI helpers =====
   syncButtons() {
-    const map = { particles: 'btn-particles', '3d': 'btn-3d', video: 'btn-video' };
+    const map = { particles: 'btn-particles', vortex: 'btn-vortex', artifact: 'btn-artifact', '3d': 'btn-3d', video: 'btn-video' };
     for (const [mode, id] of Object.entries(map)) {
       $(id)?.classList.toggle('active', this.mode === mode);
     }
