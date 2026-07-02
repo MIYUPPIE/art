@@ -4,20 +4,25 @@ import {
   makeVelocities,
   stepPositions,
 } from '../core/particlePhysics.js';
+import { PALETTE } from './palette.js';
+import { glowTexture } from './glow.js';
 
-// Three depth layers of glowing motes for parallax. Counts/colors/sizes only —
-// all the actual motion math lives in core/particlePhysics.js.
+// Three depth layers of soft glowing motes rising off the artwork for parallax.
+// Counts/colors/sizes/twinkle live here; all the motion math stays in
+// core/particlePhysics.js (pure and unit-tested). Colors come from the shared
+// palette so this reads as the same family as every other effect.
 const LAYERS = [
-  { count: 200, color: 0x00d4ff, size: 0.14, speed: 0.25, yOffset: 0.0 },
-  { count: 100, color: 0xff00aa, size: 0.24, speed: 0.18, yOffset: 0.2 },
-  { count: 150, color: 0xffff00, size: 0.10, speed: 0.32, yOffset: -0.1 },
+  { count: 220, color: PALETTE.cyan, size: 0.18, speed: 0.24, yOffset: 0.0, base: 0.85, twinkle: 0.12, rate: 1.7 },
+  { count: 120, color: PALETTE.violet, size: 0.3, speed: 0.16, yOffset: 0.25, base: 0.8, twinkle: 0.15, rate: 1.1 },
+  { count: 90, color: PALETTE.gold, size: 0.12, speed: 0.3, yOffset: -0.05, base: 0.78, twinkle: 0.2, rate: 2.3 },
 ];
 
 export function buildParticles() {
   const group = new THREE.Group();
   group.name = 'particles';
+  const map = glowTexture('dot');
 
-  for (const cfg of LAYERS) {
+  LAYERS.forEach((cfg, idx) => {
     const positions = spawnDomePositions(cfg.count, { yOffset: cfg.yOffset, rMin: 0.35, rMax: 1.4 });
     const velocities = makeVelocities(cfg.count, cfg.speed);
 
@@ -27,21 +32,18 @@ export function buildParticles() {
     const material = new THREE.PointsMaterial({
       color: cfg.color,
       size: cfg.size,
+      map,
       transparent: true,
-      opacity: 0.85,
+      opacity: cfg.base,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: false,
+      sizeAttenuation: true,
     });
 
     const points = new THREE.Points(geometry, material);
-    points.userData = { velocities };
+    points.userData = { velocities, base: cfg.base, twinkle: cfg.twinkle, rate: cfg.rate, phase: idx * 1.7 };
     group.add(points);
-  }
-
-  const light = new THREE.PointLight(0xffffff, 1, 10);
-  light.position.set(0, 1, 0);
-  group.add(light);
+  });
 
   return group;
 }
@@ -49,9 +51,11 @@ export function buildParticles() {
 export function updateParticles(group, dt, elapsed) {
   for (const child of group.children) {
     if (!child.isPoints) continue;
+    const { velocities, base, twinkle, rate, phase } = child.userData;
     const positions = child.geometry.attributes.position.array;
-    stepPositions(positions, child.userData.velocities, dt, elapsed);
+    stepPositions(positions, velocities, dt, elapsed);
     child.geometry.attributes.position.needsUpdate = true;
-    child.rotation.y = elapsed * 0.1;
+    child.rotation.y = elapsed * 0.08;
+    child.material.opacity = base + Math.sin(elapsed * rate + phase) * twinkle;
   }
 }

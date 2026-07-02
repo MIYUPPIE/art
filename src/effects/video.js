@@ -1,8 +1,11 @@
 import * as THREE from 'three';
+import { PALETTE } from './palette.js';
+import { glowTexture } from './glow.js';
 
-// Video overlay framed above the artwork. Degrades gracefully: if the mp4 is
-// missing or fails to load, the plane shows a labelled placeholder telling the
-// user where to drop their clip, so the feature still "works" out of the box.
+// Video overlay framed above the artwork, presented like a gallery screen: a
+// slim metallic frame with a palette-tinted emissive rim and a soft screen
+// glow. Degrades gracefully: if the mp4 is missing or fails, the plane shows a
+// labelled placeholder so the feature still "works" out of the box.
 
 export function buildVideo(videoUrl, artworkUrl = null) {
   const group = new THREE.Group();
@@ -23,37 +26,67 @@ export function buildVideo(videoUrl, artworkUrl = null) {
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.98,
     side: THREE.DoubleSide,
   });
 
-  // Video plane (on top)
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5625), material); // 16:9
-  plane.position.set(0, 0.55, 0.06);
+  const W = 1.0;
+  const H = 0.5625; // 16:9
 
+  // Video plane (front).
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(W, H), material);
+  plane.position.set(0, 0.55, 0.07);
+
+  // Slim brushed frame with a cyan emissive rim.
   const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(1.06, 0.62, 0.02),
-    new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.15 }),
+    new THREE.BoxGeometry(W + 0.06, H + 0.06, 0.02),
+    new THREE.MeshStandardMaterial({
+      color: 0x0d0d16,
+      metalness: 0.85,
+      roughness: 0.25,
+      emissive: PALETTE.cyan,
+      emissiveIntensity: 0.35,
+    }),
   );
-  frame.position.set(0, 0.55, 0.04);
+  frame.position.set(0, 0.55, 0.045);
 
-  // Optional artwork plane placed between the frame and the video, at 30% opacity
+  // Soft screen glow spilling out behind the frame.
+  const glow = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: glowTexture('dot'),
+      color: PALETTE.cyan,
+      opacity: 0.35,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  glow.scale.set(1.6, 1.1, 1);
+  glow.position.set(0, 0.55, 0.03);
+
+  // Optional artwork plane between the frame and the video, faintly showing
+  // through (kept from prior behaviour).
   let artPlane = null;
   if (artworkUrl) {
     try {
       const artTex = new THREE.TextureLoader().load(artworkUrl);
-      const artMat = new THREE.MeshBasicMaterial({ map: artTex, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+      const artMat = new THREE.MeshBasicMaterial({ map: artTex, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
       artPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), artMat);
-      // Position to match the frame area (square artwork behind the video)
-      artPlane.position.set(0, 0.55, 0.05);
+      artPlane.position.set(0, 0.55, 0.055);
     } catch (e) {
       artPlane = null;
     }
   }
 
-  // Add in order: frame (back), artwork (mid), video (front)
-  if (artPlane) group.add(frame, artPlane, plane);
-  else group.add(frame, plane);
+  // Order: glow (back), frame, artwork (mid), video (front).
+  group.add(glow, frame);
+  if (artPlane) group.add(artPlane);
+  group.add(plane);
+
+  // The metallic frame needs a light to catch; scene ambient alone is too flat.
+  const light = new THREE.PointLight(PALETTE.white, 1.0, 4);
+  light.position.set(0, 0.9, 0.6);
+  group.add(light);
 
   function applyPlaceholder() {
     const cv = document.createElement('canvas');
@@ -61,13 +94,13 @@ export function buildVideo(videoUrl, artworkUrl = null) {
     cv.height = 288;
     const ctx = cv.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 512, 288);
-    grad.addColorStop(0, '#00d4ff');
-    grad.addColorStop(1, '#7b2cbf');
+    grad.addColorStop(0, '#1b1140');
+    grad.addColorStop(1, '#0b2540');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 512, 288);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, 512, 288);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#eef4ff';
     ctx.textAlign = 'center';
     ctx.font = 'bold 26px sans-serif';
     ctx.fillText('Add your clip at', 256, 132);
