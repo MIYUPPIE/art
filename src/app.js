@@ -473,7 +473,11 @@ class ARArtApp {
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     this.particles = buildParticles();
     this.model = buildModel();
-    this.video = buildVideo(videoSrc);
+    // Determine artwork image URL to show under the video (uploads or shared)
+    let artworkSrc = null;
+    if (this.tab === 'custom' && this.art?.image) artworkSrc = this.art.image.src;
+    else if (this.tab === 'shared' && this.shared) artworkSrc = this.shared.urls.image;
+    this.video = buildVideo(videoSrc, artworkSrc);
     this.frame = buildFrame();
     this.artifact = buildArtifact();
     this.vortex = buildVortex();

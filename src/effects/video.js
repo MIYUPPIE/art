@@ -4,7 +4,7 @@ import * as THREE from 'three';
 // missing or fails to load, the plane shows a labelled placeholder telling the
 // user where to drop their clip, so the feature still "works" out of the box.
 
-export function buildVideo(videoUrl) {
+export function buildVideo(videoUrl, artworkUrl = null) {
   const group = new THREE.Group();
   group.name = 'video';
 
@@ -20,7 +20,6 @@ export function buildVideo(videoUrl) {
   const texture = new THREE.VideoTexture(video);
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
-
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
@@ -28,6 +27,7 @@ export function buildVideo(videoUrl) {
     side: THREE.DoubleSide,
   });
 
+  // Video plane (on top)
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5625), material); // 16:9
   plane.position.set(0, 0.55, 0.06);
 
@@ -37,7 +37,23 @@ export function buildVideo(videoUrl) {
   );
   frame.position.set(0, 0.55, 0.04);
 
-  group.add(frame, plane);
+  // Optional artwork plane placed between the frame and the video, at 30% opacity
+  let artPlane = null;
+  if (artworkUrl) {
+    try {
+      const artTex = new THREE.TextureLoader().load(artworkUrl);
+      const artMat = new THREE.MeshBasicMaterial({ map: artTex, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+      artPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), artMat);
+      // Position to match the frame area (square artwork behind the video)
+      artPlane.position.set(0, 0.55, 0.05);
+    } catch (e) {
+      artPlane = null;
+    }
+  }
+
+  // Add in order: frame (back), artwork (mid), video (front)
+  if (artPlane) group.add(frame, artPlane, plane);
+  else group.add(frame, plane);
 
   function applyPlaceholder() {
     const cv = document.createElement('canvas');
