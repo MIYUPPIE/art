@@ -16,14 +16,14 @@ export function buildVortex() {
     const colorOutside = new THREE.Color(0x00d4ff);
 
     for (let i = 0; i < particleCount; i++) {
-        const radius = Math.random() * Math.random() * 0.8;
+        const radius = Math.random() * Math.random() * 1.0;
         const angle = Math.random() * Math.PI * 2;
 
         positions[i * 3] = Math.cos(angle) * radius;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.1 * (1 - radius); // thicken near center
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.12 * (1 - radius); // thicken near center
         positions[i * 3 + 2] = Math.sin(angle) * radius;
 
-        const mixedColor = colorInside.clone().lerp(colorOutside, radius / 0.8);
+        const mixedColor = colorInside.clone().lerp(colorOutside, Math.min(1, radius / 1.0));
         colors[i * 3] = mixedColor.r;
         colors[i * 3 + 1] = mixedColor.g;
         colors[i * 3 + 2] = mixedColor.b;
@@ -37,12 +37,13 @@ export function buildVortex() {
     particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particleMat = new THREE.PointsMaterial({
-        size: 0.02,
+        size: 0.05,
         vertexColors: true,
         transparent: true,
         opacity: 0.8,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        sizeAttenuation: false,
     });
 
     const vortex = new THREE.Points(particleGeo, particleMat);

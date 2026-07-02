@@ -8,9 +8,9 @@ import {
 // Three depth layers of glowing motes for parallax. Counts/colors/sizes only —
 // all the actual motion math lives in core/particlePhysics.js.
 const LAYERS = [
-  { count: 200, color: 0x00d4ff, size: 0.020, speed: 0.25, yOffset: 0.0 },
-  { count: 100, color: 0xff00aa, size: 0.030, speed: 0.18, yOffset: 0.2 },
-  { count: 150, color: 0xffff00, size: 0.015, speed: 0.32, yOffset: -0.1 },
+  { count: 200, color: 0x00d4ff, size: 0.08, speed: 0.25, yOffset: 0.0 },
+  { count: 100, color: 0xff00aa, size: 0.12, speed: 0.18, yOffset: 0.2 },
+  { count: 150, color: 0xffff00, size: 0.06, speed: 0.32, yOffset: -0.1 },
 ];
 
 export function buildParticles() {
@@ -18,7 +18,7 @@ export function buildParticles() {
   group.name = 'particles';
 
   for (const cfg of LAYERS) {
-    const positions = spawnDomePositions(cfg.count, { yOffset: cfg.yOffset });
+    const positions = spawnDomePositions(cfg.count, { yOffset: cfg.yOffset, rMin: 0.4, rMax: 1.2 });
     const velocities = makeVelocities(cfg.count, cfg.speed);
 
     const geometry = new THREE.BufferGeometry();
@@ -31,7 +31,7 @@ export function buildParticles() {
       opacity: 0.85,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
+      sizeAttenuation: false,
     });
 
     const points = new THREE.Points(geometry, material);
