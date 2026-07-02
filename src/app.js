@@ -184,14 +184,34 @@ class ARArtApp {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      $('art-empty').classList.add('hidden');
-      const prev = $('art-preview');
-      prev.src = url; prev.classList.remove('hidden');
-      status.classList.remove('hidden');
-      this.art.file = file; // kept for the share upload
-      this.hideShareResult(); // any previous link belongs to the previous artwork
-      // Compile immediately so the gesture -> camera path at Launch stays short.
-      this.compileArt(img);
+      // Scale down image before compiling to prevent mobile crashes ("marking out")
+      const MAX_DIM = 800;
+      let w = img.width;
+      let h = img.height;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const scaledImg = new Image();
+      scaledImg.onload = () => {
+        $('art-empty').classList.add('hidden');
+        const prev = $('art-preview');
+        prev.src = url; prev.classList.remove('hidden');
+        status.classList.remove('hidden');
+        this.art.file = file; // kept for the share upload
+        this.hideShareResult(); // any previous link belongs to the previous artwork
+        // Compile using the lightweight scaled down image
+        this.compileArt(scaledImg);
+      };
+      scaledImg.src = canvas.toDataURL('image/jpeg', 0.85);
     };
     img.onerror = () => this.setArtStatus('Could not read that image.', 'err');
     img.src = url;
@@ -225,7 +245,7 @@ class ARArtApp {
     if (!this.webgl.ok) {
       this.setArtStatus(WEBGL_HELP, 'err');
       this.art.compiling = Promise.reject(new Error('WEBGL_OFF'));
-      this.art.compiling.catch(() => {}); // pre-attach so it isn't an unhandled rejection
+      this.art.compiling.catch(() => { }); // pre-attach so it isn't an unhandled rejection
       return this.art.compiling;
     }
     this.setArtStatus('Preparing marker…', null);
@@ -499,7 +519,7 @@ class ARArtApp {
     }
 
     if (!this.isTracking && !this._scanHintShown && this._cameraStartedAt &&
-        performance.now() - this._cameraStartedAt > 6000) {
+      performance.now() - this._cameraStartedAt > 6000) {
       this._scanHintShown = true;
       this.setInstructions('Still scanning. Get the marker flat, well-lit, and filling most of the frame.');
     }
